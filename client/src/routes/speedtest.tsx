@@ -14,20 +14,48 @@ function SpeedTestPage() {
   const navigate = useNavigate();
   const [status, setStatus] = useState<"idle" | "testing" | "completed" | "error">("idle");
   const [speed, setSpeed] = useState<number | null>(null);
+  const [latency, setLatency] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const startTest = async () => {
     setStatus("testing");
     setSpeed(null);
+    setLatency(null);
     setError(null);
 
     try {
-      const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/utils/speedtest`);
-      setSpeed(parseFloat(response.data.speed));
+      // 1. Measure Latency (ping)
+      const pingStart = performance.now();
+      await fetch(`https://speed.cloudflare.com/__down?bytes=1&cachebuster=${Math.random()}`, { method: 'HEAD' });
+      const pingEnd = performance.now();
+      setLatency(Math.round(pingEnd - pingStart));
+
+      // 2. Measure Download Speed (15MB payload)
+      const downloadSize = 15000000; // 15MB
+      const dlStart = performance.now();
+      
+      const response = await fetch(`https://speed.cloudflare.com/__down?bytes=${downloadSize}&cachebuster=${Math.random()}`);
+      if (!response.ok) throw new Error("Network response was not ok");
+      
+      const reader = response.body?.getReader();
+      if (reader) {
+        while(true) {
+          const {done} = await reader.read();
+          if (done) break;
+        }
+      }
+      
+      const dlEnd = performance.now();
+      const durationSeconds = (dlEnd - dlStart) / 1000;
+      
+      const bitsLoaded = downloadSize * 8;
+      const speedMbps = (bitsLoaded / durationSeconds) / 1000000;
+      
+      setSpeed(parseFloat(speedMbps.toFixed(2)));
       setStatus("completed");
     } catch (err) {
-      console.error(err);
-      setError("Unable to connect to speed test servers. Please try again.");
+      console.error("Speed test failed:", err);
+      setError("Unable to connect to edge servers. Check your connection and try again.");
       setStatus("error");
     }
   };
@@ -68,7 +96,7 @@ function SpeedTestPage() {
                    </div>
                    <div className="space-y-2">
                      <h1 className="text-4xl font-bold tracking-tight">NetPulse Speed Test</h1>
-                     <p className="text-muted-foreground">Click the button below to measure your network throughput.</p>
+                     <p className="text-muted-foreground">Click the button below to measure your actual network throughput.</p>
                    </div>
                    <button
                      onClick={startTest}
@@ -104,7 +132,7 @@ function SpeedTestPage() {
                          <span className="text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground mt-2">Testing</span>
                       </div>
                    </div>
-                   <p className="text-muted-foreground animate-pulse">Communicating with NetPulse edge servers...</p>
+                   <p className="text-muted-foreground animate-pulse">Downloading test payload from edge servers...</p>
                  </motion.div>
                )}
 
@@ -123,18 +151,14 @@ function SpeedTestPage() {
                      </div>
                    </div>
 
-                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4">
+                   <div className="grid grid-cols-2 gap-4 pt-4 max-w-sm mx-auto">
                       <div className="p-4 rounded-2xl bg-secondary/30 border border-border">
-                         <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Latency</div>
-                         <div className="text-xl font-mono">14 ms</div>
+                         <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Latency (Ping)</div>
+                         <div className="text-xl font-mono">{latency} ms</div>
                       </div>
                       <div className="p-4 rounded-2xl bg-secondary/30 border border-border">
-                         <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Jitter</div>
-                         <div className="text-xl font-mono">2 ms</div>
-                      </div>
-                      <div className="p-4 rounded-2xl bg-secondary/30 border border-border hidden md:block">
-                         <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Consistency</div>
-                         <div className="text-xl font-mono">98%</div>
+                         <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Server</div>
+                         <div className="text-xl font-mono truncate text-xs mt-2">Cloudflare Edge</div>
                       </div>
                    </div>
 

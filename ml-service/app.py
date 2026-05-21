@@ -54,8 +54,29 @@ async def predict(data: NetworkData):
     latency_roll = np.mean(history["latency"]) if history["latency"] else data.latency
     throughput_roll = np.mean(history["throughput"]) if history["throughput"] else data.throughput
 
-    # Prepare input for model in the EXACT order of training columns:
-    # ['hour', 'active_users', 'latency', 'packet_loss', 'throughput', 'signal_strength', 'users_roll', 'latency_roll', 'throughput_roll']
+    # 2. Lag Features
+    if len(history["active_users"]) >= 2:
+        users_lag1 = history["active_users"][-2]
+        latency_lag1 = history["latency"][-2]
+        throughput_lag1 = history["throughput"][-2]
+    else:
+        users_lag1 = data.active_users
+        latency_lag1 = data.latency
+        throughput_lag1 = data.throughput
+
+    # 3. Trend Features
+    latency_change = data.latency - latency_lag1
+    throughput_change = data.throughput - throughput_lag1
+
+    # 4. Volatility Features (Standard Deviation of up to 5)
+    if len(history["latency"]) >= 2:
+        latency_std = float(np.std(history["latency"], ddof=1)) if len(history["latency"]) > 1 else 0.0
+        throughput_std = float(np.std(history["throughput"], ddof=1)) if len(history["throughput"]) > 1 else 0.0
+    else:
+        latency_std = 0.0
+        throughput_std = 0.0
+
+    # Prepare input for model in the EXACT order of training columns
     input_data = pd.DataFrame([{
         "hour": current_hour,
         "active_users": data.active_users,
@@ -65,7 +86,14 @@ async def predict(data: NetworkData):
         "signal_strength": data.signal_strength,
         "users_roll": users_roll,
         "latency_roll": latency_roll,
-        "throughput_roll": throughput_roll
+        "throughput_roll": throughput_roll,
+        "latency_lag1": latency_lag1,
+        "throughput_lag1": throughput_lag1,
+        "users_lag1": users_lag1,
+        "latency_std": latency_std,
+        "throughput_std": throughput_std,
+        "latency_change": latency_change,
+        "throughput_change": throughput_change
     }])
 
     try:
