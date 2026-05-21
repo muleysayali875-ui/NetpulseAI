@@ -126,7 +126,7 @@ function DashboardPage() {
             </div>
             
             <div className="flex-1 min-h-[200px]">
-              <LiveFeed logs={logs} />
+              <LiveFeed logs={logs} compact={true} />
             </div>
           </div>
           

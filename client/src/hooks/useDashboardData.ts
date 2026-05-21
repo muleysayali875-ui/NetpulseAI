@@ -28,6 +28,23 @@ export interface ActivityLog {
   timestamp: string;
 }
 
+/** Returns the current user's id from localStorage, or null if not logged in. */
+function getCurrentUserId(): number | null {
+  try {
+    const raw = localStorage.getItem("user");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Returns the current user's JWT from localStorage. */
+function getAuthToken(): string | null {
+  return localStorage.getItem("token");
+}
+
 export function useDashboardData() {
   const [metrics, setMetrics] = useState<MetricData[]>([]);
   const [latestMetric, setLatestMetric] = useState<MetricData | null>(null);
@@ -58,7 +75,7 @@ export function useDashboardData() {
       log: `users=${metric.active_users}, latency=${metric.latency.toFixed(0)}ms, throughput=${metric.throughput.toFixed(1)}Mbps, congestion=${metric.congestionStatus.toUpperCase()}${futureLog}`,
       timestamp: metric.time,
     };
-    setLogs((prev) => [...prev.slice(-49), newLog]);
+    setLogs((prev) => [...prev.slice(-499), newLog]);
 
     // Generate alerts based on thresholds
     if (metric.congestionStatus === "High") {
@@ -80,11 +97,16 @@ export function useDashboardData() {
     }
   };
 
-  // 1) Fetch historical data on mount
+  // 1) Fetch THIS USER'S historical data on mount (authenticated request)
   useEffect(() => {
     const fetchHistory = async () => {
+      const token = getAuthToken();
+      if (!token) return;
+
       try {
-        const response = await axios.get(`${API_URL}/api/iot/metrics?limit=30`);
+        const response = await axios.get(`${API_URL}/api/iot/metrics?limit=30`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         if (response.data?.data) {
           const history: MetricData[] = response.data.data;
           setMetrics(history);
@@ -95,7 +117,6 @@ export function useDashboardData() {
             setApiStatus("Online");
             setModelStatus("Active");
 
-            // Create an initial log entry
             setAlerts([
               {
                 id: "init",
@@ -120,7 +141,7 @@ export function useDashboardData() {
     fetchHistory();
   }, []);
 
-  // 2) Connect to WebSocket for real-time updates
+  // 2) Connect to WebSocket and join THIS USER'S private room
   useEffect(() => {
     const socket = io(API_URL, {
       transports: ["websocket", "polling"],
@@ -130,6 +151,13 @@ export function useDashboardData() {
     socket.on("connect", () => {
       console.log("WebSocket connected:", socket.id);
       setApiStatus("Online");
+
+      // ✅ Join this user's private room so we only receive our own metrics
+      const userId = getCurrentUserId();
+      if (userId) {
+        socket.emit("join_user_room", userId);
+        console.log("Joined private room for user:", userId);
+      }
     });
 
     socket.on("new_metric", (data: MetricData) => {

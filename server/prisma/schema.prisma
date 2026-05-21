@@ -8,24 +8,29 @@ datasource db {
 }
 
 model User {
-  id          Int      @id @default(autoincrement())
-  name        String
-  email       String   @unique
-  password    String
-  company     String?
-  isVerified  Boolean  @default(false)
-  otp         String?
-  otpExpiry   DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             Int             @id @default(autoincrement())
+  name           String
+  email          String          @unique
+  password       String
+  company        String?
+  isVerified     Boolean         @default(false)
+  otp            String?
+  otpExpiry      DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  networkMetrics NetworkMetric[]
 }
 
 model NetworkMetric {
-  id               Int      @id @default(autoincrement())
-  active_users     Int
-  latency          Float
-  throughput       Float
-  congestion_level Int
+  id                Int      @id @default(autoincrement())
+  userId            Int
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  active_users      Int
+  latency           Float
+  throughput        Float
+  congestion_level  Int
   future_congestion Int?
-  timestamp        DateTime @default(now())
+  timestamp         DateTime @default(now())
+
+  @@index([userId])
 }

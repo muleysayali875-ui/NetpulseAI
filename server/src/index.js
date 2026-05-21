@@ -23,6 +23,15 @@ app.set("io", io);
 
 io.on("connection", (socket) => {
   console.log("Client connected via WebSocket:", socket.id);
+
+  // Client sends their userId so we can put them in a private room
+  socket.on("join_user_room", (userId) => {
+    if (userId) {
+      socket.join(`user:${userId}`);
+      console.log(`Socket ${socket.id} joined room user:${userId}`);
+    }
+  });
+
   socket.on("disconnect", () => {
     console.log("Client disconnected:", socket.id);
   });
