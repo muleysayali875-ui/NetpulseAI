@@ -90,4 +90,4 @@ Contains firmware code (`esp32_netpulse.ino`) for an ESP32 microcontroller (typi
 This project is licensed under the ISC License.
 
 
-[![Watch Demo](https://img.youtube.com/vi/dQw4w9WgXcQ/0.jpg)](https://youtu.be/EUgogS5QBdU)
+[![Watch Demo](https://drive.google.com/file/d/1SVE3EDkULbVcVWk2_BTBDBelzSivGI4w/view?usp=sharing)](https://youtu.be/EUgogS5QBdU)
